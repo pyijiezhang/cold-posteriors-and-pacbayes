@@ -53,7 +53,11 @@ def get_data(
     assert Y.shape == (n_data, d_y)
     assert X_orig.shape == (n_data,)
 
-    return X, Y, X_orig
+    return (
+        torch.from_numpy(X).float(),
+        torch.from_numpy(Y).float(),
+        torch.from_numpy(X_orig).float(),
+    )
 
 
 def get_X_show(d_x=101, n_data=10000):
@@ -64,4 +68,4 @@ def get_X_show(d_x=101, n_data=10000):
     assert X.shape == (n_data, d_x)
     assert X_orig.shape == (n_data,)
 
-    return X, X_orig
+    return torch.from_numpy(X).float(), torch.from_numpy(X_orig).float()
