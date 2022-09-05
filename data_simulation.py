@@ -22,7 +22,7 @@ def get_fourier_basis(x, p):
     return res
 
 
-def get_data(
+def get_data_grunwald(
     y=0.0,
     d_x=101,
     n_data=100,
@@ -60,12 +60,36 @@ def get_data(
     )
 
 
-def get_X_show(d_x=101, n_data=10000):
-    """handy for making model fit plot"""
-    X_orig = np.linspace(-1.0, 1.0, n_data)
+def get_data_1(
+    d_x=101,
+    n_data=100,
+    variance=0.025,
+):
+    d_y = 1
+
+    X_orig = np.random.uniform(-1.0, 1.0, n_data)
     X = np.asarray(get_fourier_basis(X_orig, d_x))
+    Y = np.random.normal(
+        np.sum(X, 1).reshape(n_data, 1), np.sqrt(variance), (n_data, 1)
+    )
 
     assert X.shape == (n_data, d_x)
+    assert Y.shape == (n_data, d_y)
     assert X_orig.shape == (n_data,)
 
-    return torch.from_numpy(X).float(), torch.from_numpy(X_orig).float()
+    return (
+        torch.from_numpy(X).float(),
+        torch.from_numpy(Y).float(),
+        torch.from_numpy(X_orig).float(),
+    )
+
+
+# def get_X_show_grunwald(d_x=101, n_data=10000):
+#     """handy for making model fit plot"""
+#     X_orig = np.linspace(-1.0, 1.0, n_data)
+#     X = np.asarray(get_fourier_basis(X_orig, d_x))
+
+#     assert X.shape == (n_data, d_x)
+#     assert X_orig.shape == (n_data,)
+
+#     return torch.from_numpy(X).float(), torch.from_numpy(X_orig).float()
