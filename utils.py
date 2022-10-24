@@ -4,13 +4,25 @@ from torch.distributions.normal import Normal
 from torch.distributions.multivariate_normal import MultivariateNormal
 
 
-def get_measures(var_prior, var_likelihood, X_train, Y_train, X_test, Y_test, lambs):
-    log_risks = []  # expected risk bayesian posterior predictive
-    r_log_risks = []  # expected gibbs risk
-    emp_r_log_risks = []  # empirical gibbs risk
-    kls = []  # kl between posterior and prior
-    vars_prior_pred = []  # prior predictive variance
-    lambs_optimal = []
+def get_measures(
+    var_prior,
+    var_likelihood,
+    X_train,
+    Y_train,
+    X_test,
+    Y_test,
+    lambs,
+    n_prior_samples=5000,
+    n_post_samples=5000,
+):
+    results = {}
+    results["bayes_risks"] = []  # expected log risk of bayesian posterior predictive
+    results["gibbs_risks"] = []  # expected gibbs risk
+    results["emp_gibbs_risks"] = []  # empirical gibbs risk
+    results["kls"] = []  # kl between posterior and prior
+    results["vars_prior_pred"] = []  # prior predictive variance
+    results["lambs_optimal"] = []  # optimal lamb according to eq.10 in draft.tex
+    results["covs_gibbs"] = []  # covariance in slides.tex
     for lamb in lambs:
 
         print(lamb)
@@ -21,12 +33,9 @@ def get_measures(var_prior, var_likelihood, X_train, Y_train, X_test, Y_test, la
 
         # settings
         # prior
-        var_prior = torch.tensor(var_prior)
-        n_prior_samples = 5000  # no. of samples from prior
+        var_prior = torch.as_tensor(var_prior)
         # likelihood
-        var_likelihood = torch.tensor(var_likelihood)
-        # posterior
-        n_post_samples = 5000  # no. of samples from posterior
+        var_likelihood = torch.as_tensor(var_likelihood)
 
         # compute posterior distribution, see bishop eq 3.53 and 3.54
         # X_train is the design matrix, n_train by d_x matrix
@@ -54,18 +63,20 @@ def get_measures(var_prior, var_likelihood, X_train, Y_train, X_test, Y_test, la
         ).log_prob(Y_train)
 
         # get bayesian generalization loss
-        log_risk = (
-            torch.log(torch.tensor(n_post_samples)) - torch.logsumexp(log_p_test, 1)
-        ).mean()
-        log_risks.append(log_risk)
+        bayes_risk = (
+            (torch.log(torch.tensor(n_post_samples)) - torch.logsumexp(log_p_test, 1))
+            .mean()
+            .item()
+        )
+        results["bayes_risks"].append(bayes_risk)
 
         # get expected gibbs loss
-        r_log_risk = -log_p_test.mean().item()
-        r_log_risks.append(r_log_risk)
+        gibbs_risk = -log_p_test.mean().item()
+        results["gibbs_risks"].append(gibbs_risk)
 
         # get empirical gibbs loss
-        emp_r_log_risk = -log_p_train.mean().item()
-        emp_r_log_risks.append(emp_r_log_risk)
+        emp_gibbs_risk = -log_p_train.mean().item()
+        results["emp_gibbs_risks"].append(emp_gibbs_risk)
 
         # prior predictive variance
         p_prior = MultivariateNormal(torch.zeros(d_x), torch.eye(d_x) * var_prior)
@@ -91,23 +102,25 @@ def get_measures(var_prior, var_likelihood, X_train, Y_train, X_test, Y_test, la
                 0,
             )
         ).item()
-        vars_prior_pred.append(var_prior_pred)
+        results["vars_prior_pred"].append(var_prior_pred)
 
         # kl between p^lamb and prior
         kl = torch.distributions.kl.kl_divergence(p_post, p_prior).item()
-        kls.append(kl)
+        results["kls"].append(kl)
 
         # compute lamb^*
         lamb_optimal = torch.sqrt(
             2 * (kl + torch.log(torch.tensor(20.0))) / var_prior_pred
-        )
-        lambs_optimal.append(lamb_optimal.item())
+        ).item()
+        results["lambs_optimal"].append(lamb_optimal)
 
-    return (
-        log_risks,
-        r_log_risks,
-        emp_r_log_risks,
-        kls,
-        vars_prior_pred,
-        lambs_optimal,
-    )
+        # covariance
+        cov_gibbs = (
+            -n_train
+            * (
+                (log_p_train.mean(0) * log_p_test.mean(0)).mean()
+                - log_p_test.mean() * log_p_train.mean()
+            ).item()
+        )
+        results["covs_gibbs"].append(cov_gibbs)
+    return results
