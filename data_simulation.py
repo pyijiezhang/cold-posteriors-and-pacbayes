@@ -22,32 +22,22 @@ def get_fourier_basis(x, p):
     return res
 
 
-def get_data_grunwald(
-    y=0.0,
+def get_data_specified(
     d_x=101,
     n_data=100,
-    if_misspecified=True,
 ):
+    """model is well-specified.
+    data generating process is v(y|x)=p(y|x,theta)=N(fourier(x)^T@theta,variance),
+    where theta=1
+    """
+    variance = 1.0 / 40.0
     d_y = 1
 
-    if if_misspecified:
-        variance = 2 * 1.0 / 40.0
-        n_easy = np.random.binomial(n_data, 0.5)
-        X_orig = np.concatenate(
-            [np.random.uniform(-1.0, 1.0, n_data - n_easy), np.zeros(n_easy)]
-        )
-        X = np.asarray(get_fourier_basis(X_orig, d_x))
-        Y = np.concatenate(
-            [
-                np.random.normal(y, np.sqrt(variance), (n_data - n_easy, 1)),
-                np.ones((n_easy, 1)) * y,
-            ]
-        )
-    else:
-        variance = 1.0 / 40.0
-        X_orig = np.random.uniform(-1.0, 1.0, n_data)
-        X = np.asarray(get_fourier_basis(X_orig, d_x))
-        Y = np.random.normal(y, np.sqrt(variance), (n_data, 1))
+    X_orig = np.random.uniform(-1.0, 1.0, n_data)
+    X = np.asarray(get_fourier_basis(X_orig, d_x))
+    Y = np.random.normal(
+        np.sum(X, 1).reshape(n_data, 1), np.sqrt(variance), (n_data, 1)
+    )
 
     assert X.shape == (n_data, d_x)
     assert Y.shape == (n_data, d_y)
@@ -60,17 +50,26 @@ def get_data_grunwald(
     )
 
 
-def get_data_1(
+def get_data_misspecified(
     d_x=101,
     n_data=100,
-    variance=0.025,
 ):
+    """model is misspecified because data is heterogeneous while
+    the model class is homogeneous.
+    """
+    y = 1.0  # mean of the data generating process
     d_y = 1
-
-    X_orig = np.random.uniform(-1.0, 1.0, n_data)
+    variance = 2 * 1.0 / 40.0
+    n_easy = np.random.binomial(n_data, 0.5)
+    X_orig = np.concatenate(
+        [np.random.uniform(-1.0, 1.0, n_data - n_easy), np.zeros(n_easy)]
+    )
     X = np.asarray(get_fourier_basis(X_orig, d_x))
-    Y = np.random.normal(
-        np.sum(X, 1).reshape(n_data, 1), np.sqrt(variance), (n_data, 1)
+    Y = np.concatenate(
+        [
+            np.random.normal(y, np.sqrt(variance), (n_data - n_easy, 1)),
+            np.ones((n_easy, 1)) * y,
+        ]
     )
 
     assert X.shape == (n_data, d_x)
