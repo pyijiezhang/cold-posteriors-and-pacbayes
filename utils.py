@@ -16,13 +16,13 @@ def get_measures(
     n_post_samples=5000,
 ):
     results = {}
-    results["bayes_risks"] = []  # expected log risk of bayesian posterior predictive
-    results["gibbs_risks"] = []  # expected gibbs risk
-    results["emp_gibbs_risks"] = []  # empirical gibbs risk
-    results["kls"] = []  # kl between posterior and prior
-    results["vars_prior_pred"] = []  # prior predictive variance
-    results["lambs_optimal"] = []  # optimal lamb according to eq.10 in draft.tex
-    results["covs_gibbs"] = []  # covariance in slides.tex
+    results["bayes_risk"] = []  # expected log risk of bayesian posterior predictive
+    results["gibbs_risk"] = []  # expected gibbs risk
+    results["emp_gibbs_risk"] = []  # empirical gibbs risk
+    results["kl"] = []  # kl between posterior and prior
+    results["var_prior_pred"] = []  # prior predictive variance
+    results["lamb_optimal"] = []  # optimal lamb according to eq.10 in draft.tex
+    results["grad_expected_gibbs"] = []  # covariance in slides.tex
     for lamb in lambs:
 
         print(lamb)
@@ -68,15 +68,15 @@ def get_measures(
             .mean()
             .item()
         )
-        results["bayes_risks"].append(bayes_risk)
+        results["bayes_risk"].append(bayes_risk)
 
         # get expected gibbs loss
         gibbs_risk = -log_p_test.mean().item()
-        results["gibbs_risks"].append(gibbs_risk)
+        results["gibbs_risk"].append(gibbs_risk)
 
         # get empirical gibbs loss
         emp_gibbs_risk = -log_p_train.mean().item()
-        results["emp_gibbs_risks"].append(emp_gibbs_risk)
+        results["emp_gibbs_risk"].append(emp_gibbs_risk)
 
         # prior predictive variance
         p_prior = MultivariateNormal(torch.zeros(d_x), torch.eye(d_x) * var_prior)
@@ -102,25 +102,25 @@ def get_measures(
                 0,
             )
         ).item()
-        results["vars_prior_pred"].append(var_prior_pred)
+        results["var_prior_pred"].append(var_prior_pred)
 
         # kl between p^lamb and prior
         kl = torch.distributions.kl.kl_divergence(p_post, p_prior).item()
-        results["kls"].append(kl)
+        results["kl"].append(kl)
 
         # compute lamb^*
         lamb_optimal = torch.sqrt(
             2 * (kl + torch.log(torch.tensor(20.0))) / var_prior_pred
         ).item()
-        results["lambs_optimal"].append(lamb_optimal)
+        results["lamb_optimal"].append(lamb_optimal)
 
-        # covariance
-        cov_gibbs = (
+        # derivative of expected gibbs loss
+        grad_expected_gibbs = (
             -n_train
             * (
                 (log_p_train.mean(0) * log_p_test.mean(0)).mean()
                 - log_p_test.mean() * log_p_train.mean()
             ).item()
         )
-        results["covs_gibbs"].append(cov_gibbs)
+        results["grad_expected_gibbs"].append(grad_expected_gibbs)
     return results
