@@ -122,3 +122,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+results/vi, nn, classification/main/prior/.DS_Store
+.gitignore
+results/vi, nn, classification/main/likelihood/.DS_Store
+.DS_Store
+.gitignore
+.gitignore
