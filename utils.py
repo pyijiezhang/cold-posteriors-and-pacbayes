@@ -43,7 +43,7 @@ def get_metrics(
 
             # settings
             # prior
-            var_prior = torch.as_tensor(gamma)
+            var_prior = torch.as_tensor(1 / gamma)
             # likelihood
             var_likelihood = torch.as_tensor(var_likelihood)
 
