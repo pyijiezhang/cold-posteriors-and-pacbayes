@@ -65,16 +65,16 @@ def get_X_show(d_x=10, n_data=10000):
 def get_metrics(
     X_train,
     Y_train,
-    X_train_orig,
     X_test,
     Y_test,
-    X_test_orig,
     var_prior,
     var_likelihood,
     lambs,
-    n_post_samples=5000,
+    n_post_samples=10000,
 ):
     results = {}
+
+    results["p_post"] = []
 
     results["nll_bayes_test"] = []
     results["nll_bayes_train"] = []
@@ -86,6 +86,9 @@ def get_metrics(
     results["mse_gibbs_test"] = []
     results["mse_gibbs_train"] = []
 
+    results["grad_expected_bayes"] = []
+    results["grad_empirical_gibbs"] = []
+
     for lamb in lambs:
 
         print(lamb)
@@ -93,9 +96,9 @@ def get_metrics(
         d_x = X_train.shape[1]
 
         # prior
-        var_prior = torch.as_tensor(var_prior)
+        var_prior = torch.tensor(var_prior)
         # likelihood
-        var_likelihood = torch.as_tensor(var_likelihood)
+        var_likelihood = torch.tensor(var_likelihood)
 
         # compute posterior distribution, see bishop eq 3.53 and 3.54
         # X_train is the design matrix, n_train by d_x matrix
@@ -112,9 +115,11 @@ def get_metrics(
         S_N = torch.inverse(S_N_inv)  # posterior variance
         m_N = (beta * S_N @ X_train.T @ Y_train).reshape(-1)  # posterior mean
         p_post = MultivariateNormal(m_N, precision_matrix=S_N_inv)
+        results["p_post"].append(p_post)
 
-        # log_p:n_test,n_post_samples
+        # X:n,d_x, Y:n,1
         # samples_post:n_post_samples,d_x
+        # log_p:n,n_post_samples
         samples_post = p_post.sample((n_post_samples,))
         log_p_test = Normal(
             X_test @ samples_post.T, torch.sqrt(var_likelihood)
@@ -123,6 +128,7 @@ def get_metrics(
             X_train @ samples_post.T, torch.sqrt(var_likelihood)
         ).log_prob(Y_train)
 
+        # compute nll
         nll_bayes_test = (
             (torch.log(torch.tensor(n_post_samples)) - torch.logsumexp(log_p_test, 1))
             .mean()
@@ -143,25 +149,42 @@ def get_metrics(
         nll_gibbs_train = -log_p_train.mean().item()
         results["nll_gibbs_train"].append(nll_gibbs_train)
 
+        # compute mse
         mse_bayes_test = (
-            (((X_test @ samples_post.mean(0)).mean() - X_test_orig) ** 2).mean().item()
+            (((X_test @ samples_post.mean(0)) - Y_test.reshape(-1)) ** 2).mean().item()
         )
         mse_bayes_train = (
-            (((X_train @ samples_post.mean(0)).mean() - X_train_orig) ** 2)
+            (((X_train @ samples_post.mean(0)) - Y_train.reshape(-1)) ** 2)
             .mean()
             .item()
         )
-        mse_gibbs_test = (
-            (((samples_post @ X_test.T).mean(0) - X_test_orig) ** 2).mean().item()
-        )
-        mse_gibbs_train = (
-            (((samples_post @ X_train.T).mean(0) - X_train_orig) ** 2).mean().item()
-        )
+        mse_gibbs_test = (((X_test @ samples_post.T) - Y_test) ** 2).mean().item()
+        mse_gibbs_train = (((X_train @ samples_post.T) - Y_train) ** 2).mean().item()
 
         results["mse_bayes_test"].append(mse_bayes_test)
         results["mse_bayes_train"].append(mse_bayes_train)
         results["mse_gibbs_test"].append(mse_gibbs_test)
         results["mse_gibbs_train"].append(mse_gibbs_train)
+
+        # compute grad
+        log_p_train.sum(0)
+        torch.exp(log_p_test)
+        p_test = torch.exp(log_p_test)
+        grad_expected_bayes = (
+            -1
+            * (
+                (
+                    (p_test * log_p_train.sum(0)).mean(1)
+                    - log_p_train.sum(0).mean() * p_test.mean(1)
+                )
+                / p_test.mean(1)
+            )
+            .mean()
+            .item()
+        )
+        results["grad_expected_bayes"].append(grad_expected_bayes)
+        grad_empirical_gibbs = -torch.var(log_p_train.sum(0)).item()
+        results["grad_empirical_gibbs"].append(grad_empirical_gibbs)
 
     return results
 
@@ -170,8 +193,8 @@ def get_post(X_train, Y_train, var_prior, var_likelihood, lamb):
 
     d_x = X_train.shape[1]
 
-    var_prior = torch.as_tensor(var_prior)
-    var_likelihood = torch.as_tensor(var_likelihood)
+    var_prior = torch.tensor(var_prior)
+    var_likelihood = torch.tensor(var_likelihood)
 
     # compute posterior distribution, see bishop eq 3.53 and 3.54
     # X_train is the design matrix, n_train by d_x matrix
@@ -184,4 +207,14 @@ def get_post(X_train, Y_train, var_prior, var_likelihood, lamb):
     S_N = torch.inverse(S_N_inv)  # posterior variance
     m_N = (beta * S_N @ X_train.T @ Y_train).reshape(-1)  # posterior mean
 
-    return m_N, S_N
+    return m_N, S_N, MultivariateNormal(m_N, precision_matrix=S_N_inv)
+
+
+def get_grad_emp_gibbs(p_post, n_post_samples, var_likelihood, X_train, Y_train):
+    post_samples = p_post.sample(sample_shape=(n_post_samples,))
+    likelihood = Normal(
+        X_train @ post_samples.T, torch.sqrt(torch.tensor(var_likelihood))
+    )
+    return -torch.var(
+        likelihood.log_prob(Y_train.reshape((Y_train.shape[0], 1))).sum(0)
+    )
