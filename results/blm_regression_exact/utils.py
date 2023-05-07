@@ -24,17 +24,14 @@ def get_fourier_basis(x, p):
     return res
 
 
-def get_data(
-    d_x=10,
-    n_data=50,
-):
+def get_data(d_x=10, n_data=50, x_start=-1.0):
     """
     data generating process:v(y|x)=p(y|x,theta)=N(fourier(x)^T@theta,variance), where theta=1
     """
     variance = 0.025
     d_y = 1
 
-    X_orig = np.random.uniform(-1.0, 1.0, n_data)
+    X_orig = np.random.uniform(x_start, x_start + 2, n_data)
     X = np.asarray(get_fourier_basis(X_orig, d_x))
     Y = np.random.normal(
         np.sum(X, 1).reshape(n_data, 1), np.sqrt(variance), (n_data, 1)
@@ -90,7 +87,6 @@ def get_metrics(
     results["grad_empirical_gibbs"] = []
 
     for lamb in lambs:
-
         print(lamb)
 
         d_x = X_train.shape[1]
@@ -190,7 +186,6 @@ def get_metrics(
 
 
 def get_post(X_train, Y_train, var_prior, var_likelihood, lamb):
-
     d_x = X_train.shape[1]
 
     var_prior = torch.tensor(var_prior)
